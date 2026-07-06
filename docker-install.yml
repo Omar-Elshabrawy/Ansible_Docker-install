@@ -1,0 +1,73 @@
+---
+ - name: Install Docker
+   hosts: all
+   become: true
+   vars:
+    target: "devuser"
+
+   tasks:
+    - name: get and update the needed Dependencies
+      ansible.builtin.apt:
+        name:
+          - -y
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: yes
+
+
+    - name: Add Docker’s Official GPG Key
+      ansible.builtin.apt_key:
+        link: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+
+    - name: Add the Repository to APT Sources
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+               $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+               sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        state: present
+        update_cache: yes
+
+
+    - name: Install Docker Engine and Plugins
+      ansible.builtin.apt:
+        name:
+          - -y
+          - docker-ce-cli
+          - docker-ce
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+
+    - name: Ensure the devuser
+      ansible.builtin.user:
+        name: "{{ target_user }}"
+        shell: /bin/bash
+        state: present
+
+
+    - name: put the devuser in docker group
+      ansible.builtin.user:
+        name: "{{ target_user }}"
+        groups: docker
+        append: yes
+
+
+    - name: Ensure the service is running and enabled
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+
+    - name: Reset connection so group changes take effect
+      ansible.builtin.meta: reset_connection
+        description: >
+        Group changes don't apply to existing active SSH sessions.
+        Resetting the connection ensures the user sees their new group membership immediately.
